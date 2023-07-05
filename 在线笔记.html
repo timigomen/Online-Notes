@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick-theme.min.css" />
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.js"></script>
+<style>
+ body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f2f2f2;
+    }
+
+    h1 {
+        text-align: center;
+        color: #333;
+    }
+
+    textarea {
+        width: 100%;
+        height: 100px;
+        resize: vertical;
+        border: 2px solid #ccc;
+        padding: 5px;
+        font-size: 14px;
+    }
+
+    #content-div {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #ffffff;
+        padding: 10px 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        font-size: 14px;
+        color: #333333;
+    }
+    
+    #delete-button {
+        background-color: red;
+    }
+
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #4caf50;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+    }
+
+    button:hover {
+        background-color: #45a049;
+    }
+
+    #note-list {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        margin-bottom: 10px;
+        position: relative;
+        background-color: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .delete-button {
+        position: relative;
+        right: 0;
+        top: 5px;
+        padding: 5px 10px;
+        background-color: #ff5555;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .delete-button:hover {
+        background-color: #cc0000;
+    }
+
+    /* 添加滚动条样式 */
+    #note-list-container {
+        overflow-y: auto;
+        margin-bottom: 10px;
+    }
+
+    #note-list {
+        list-style-type: none;
+        padding: 0;
+        white-space: nowrap; /* 防止换行 */
+        overflow-x: auto; /* 添加水平滚动条 */
+    }
+</style>
+<title>✍️</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>
+    // 删除笔记
+function deleteNote(index) {
+    var notes = JSON.parse(localStorage.getItem("notes")) || [];
+    if (index >= 0 && index < notes.length) {
+        // 弹出确认对话框
+        var confirmation = confirm("确定要删除该笔记吗？");
+        if (confirmation) {
+            notes.splice(index, 1);
+            localStorage.setItem("notes", JSON.stringify(notes));
+            displayNotes();
+            alert("笔记已删除！");
+        }
+    }
+}
+    // 弹出密码输入框
+    function showPasswordPrompt(index) {
+        var password = prompt("请输入密码：");
+        if (password !== null) {
+            checkPassword(index, password);
+        }
+    }
+
+    // 检查密码是否正确
+function checkPassword(index, password) {
+  var notes = JSON.parse(localStorage.getItem("notes")) || [];
+  if (index >= 0 && index < notes.length) {
+    var note = notes[index];
+    if (password === "") {
+      // 密码为空时直接显示笔记内容并复制到剪切板
+      copyToClipboard(note.timestamp + " - " + note.content);
+      alert("笔记内容已复制到剪切板！");
+    } else {
+      var decryptedContent = decryptNoteContent(note.content, password);
+      if (decryptedContent !== null) {
+        // 显示笔记内容并复制到剪切板
+        copyToClipboard(note.timestamp + " - " + decryptedContent);
+        alert("笔记内容已复制到剪切板！");
+      } else {
+        alert("密码错误！");
+      }
+    }
+  }
+}
+
+// 复制文本到剪切板
+function copyToClipboard(text) {
+  var textarea = document.createElement("textarea");
+  textarea.value = text;
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  // 创建并显示显示内容的div
+  var contentDiv = document.createElement("div");
+  contentDiv.id = "content-div"; // Set the id for styling
+  contentDiv.textContent = text;
+  document.body.appendChild(contentDiv);
+  // 在一定时间后移除显示内容的div
+  setTimeout(function () {
+    document.body.removeChild(contentDiv);
+  }, 10000);
+}
+
+
+    // 保存笔记
+    function saveNote() {
+        var noteInput = document.getElementById("note");
+        var note = noteInput.value;
+        var timestamp = new Date().toLocaleString();
+        var password = prompt("请设置密码：");
+        if (password !== null) {
+            // Encrypt the note content with the password
+            var encryptedNote = encryptNoteContent(note, password);
+
+            var newNote = { timestamp: timestamp, content: encryptedNote };
+            var notes = JSON.parse(localStorage.getItem("notes")) || [];
+            notes.push(newNote);
+            localStorage.setItem("notes", JSON.stringify(notes));
+            console.log("笔记已保存！");
+            displayNotes();
+    
+            // 清空输入框内容
+            noteInput.value = "";
+        }
+    }
+
+    // 显示笔记列表
+function displayNotes() {
+    var notes = JSON.parse(localStorage.getItem("notes")) || [];
+    var noteListContainer = document.getElementById("note-list-container");
+    noteListContainer.innerHTML = ""; // 清空笔记列表
+    
+    if (notes.length === 0) { // 如果没有笔记
+        var noNoteText = document.createElement("div");
+        noNoteText.textContent = "NaN";
+        noteListContainer.appendChild(noNoteText);
+    } else {
+        for (var i = 0; i < notes.length; i++) {
+            var listItem = document.createElement("li");
+            var noteContent = document.createElement("div");
+            noteContent.textContent = notes[i].timestamp + " - " + decryptNoteContent(notes[i].content, "");
+            listItem.appendChild(noteContent);
+            var lockButton = document.createElement("button");
+            lockButton.textContent = "🔒";
+            lockButton.setAttribute("onclick", "showPasswordPrompt(" + i + ")");
+            listItem.appendChild(lockButton);
+            if (notes[i].content !== "") { // 如果密码不为空，则显示密码标识
+                var passwordIcon = document.createElement("span");
+                passwordIcon.textContent = "🔐";
+                listItem.appendChild(passwordIcon);
+            }
+            var deleteButton = document.createElement("button");
+            deleteButton.textContent = "删除";
+            deleteButton.setAttribute("onclick", "deleteNote(" + i + ")");
+            listItem.appendChild(deleteButton);
+            noteListContainer.appendChild(listItem);
+        }
+    }
+}
+
+
+    // 加密笔记内容
+    function encryptNoteContent(content, password) {
+        var encryptedBytes = CryptoJS.AES.encrypt(content, password);
+        var encryptedNote = encryptedBytes.toString();
+        return encryptedNote;
+    }
+
+    // 解密笔记内容
+    function decryptNoteContent(encryptedContent, password) {
+        try {
+            var decryptedBytes = CryptoJS.AES.decrypt(encryptedContent, password);
+            var decryptedNote = decryptedBytes.toString(CryptoJS.enc.Utf8);
+            return decryptedNote;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // 加载笔记
+    window.onload = function () {
+        displayNotes();
+    };
+    // 删除全部笔记
+function deleteAllNotes() {
+    var confirmation = confirm("确定要删除全部笔记吗？此操作不可恢复！");
+    if (confirmation) {
+        localStorage.removeItem("notes");
+        displayNotes();
+        alert("全部笔记已删除！");
+    }
+}
+</script>
+</head>
+<body>
+<h1>✍️在线笔记✍️</h1>
+<div class="slider-container">
+  <div class="slider">
+    <div>力保用户隐私，数据加密存储本地</div>
+    <div>FanOS2.0已经支持导入导出数据（按钮在系统状态里）</div>
+    <div>FanOS2.0加入滚动公告</div>
+  </div>
+</div>
+<br>
+<style>
+  .slider-container {
+    background-color: #f2f2f2;
+    padding: 0px;
+  }
+
+  .slider {
+    width: 100%;
+  }
+
+  .slider div {
+    text-align: center;
+    font-size: 18px;
+    color: #333;
+  }
+</style>
+<script>
+  $(document).ready(function() {
+    $(".slider").slick({
+      autoplay: true,
+      autoplaySpeed: 3000,
+      dots: true,
+      arrows: false
+    });
+  });
+</script>
+<textarea id="note" rows="5" cols="30"></textarea>
+<br>
+<button onclick="saveNote()">保存笔记</button>
+<h2>笔记列表</h2>
+<div id="note-list-container">
+    <ul id="note-list"></ul>
+</div>
+<footer>
+    <p id="run-time"></p>
+    <p id="version"></p>
+    <button id="delete-button" onclick="deleteAllNotes()">一键删除全部笔记</button>
+    <button onclick="showSystemStatus()">系统状态</button>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="popup" id="system-status-card">
+  <button class="close-button" onclick="hideSystemStatus()">✕</button>
+  <h3>系统状态</h3>
+  <p>时间：<span id="current-date-time"></span></p>
+  <p>系统：FanOS 2.0.0</p>
+  <p>各项服务正常</p>
+  <button onclick="backupNotes()">一键备份笔记</button>
+  <button onclick="importNotes()">导入备份内容</button>
+
+</div>
+<style>
+  /* 添加遮罩层样式 */
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    display: none;
+  }
+
+  /* 添加弹窗样式 */
+  .popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 16px;
+    color: #333333;
+    z-index: 10000;
+    display: none;
+  }
+
+  /* 添加关闭按钮样式 */
+  .close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 14px;
+    color: #666666;
+    cursor: pointer;
+    outline: none;
+    border: none;
+    background-color: transparent;
+  }
+  /* 鼠标悬停时关闭按钮的颜色变化 */
+  .close-button:hover {
+    color: #ffffff;
+  }
+</style>
+</footer>
+<script>
+    // 计算网站运行时间
+    var startTime = new Date("2023-06-29 08:33:15");
+    var currentTime = new Date();
+    var runTime = Math.floor((currentTime - startTime) / (1000 * 60 * 60 * 24));
+
+    // 定义版本号
+    var version = "2.0.0";
+
+    // 更新网站运行时间和版本号
+    document.getElementById("run-time").textContent = "网站运行时间：" + runTime + "天";
+    document.getElementById("version").textContent = "版本号：" + version;
+    function showSystemStatus() {
+    var overlay = document.getElementById("overlay");
+    var systemStatusCard = document.getElementById("system-status-card");
+
+    overlay.style.display = "block";
+    systemStatusCard.style.display = "block";
+
+    // 更新时间的显示
+    var currentDateTimeElement = document.getElementById("current-date-time");
+    updateDateTime(currentDateTimeElement);
+  }
+
+  function hideSystemStatus() {
+    var overlay = document.getElementById("overlay");
+    var systemStatusCard = document.getElementById("system-status-card");
+
+    overlay.style.display = "none";
+    systemStatusCard.style.display = "none";
+  }
+
+  function updateDateTime(element) {
+    var currentDateTime = new Date().toLocaleString();
+    element.textContent = currentDateTime;
+    setTimeout(function () {
+      updateDateTime(element);
+    }, 1000); // 每秒更新时间
+  }
+  function backupNotes() {
+    var notes = JSON.parse(localStorage.getItem("notes")) || [];
+    var jsonStr = JSON.stringify(notes);
+    
+    var blob = new Blob([jsonStr], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    
+    var link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "notes_backup.json");
+    
+    link.style.display = "none";
+    document.body.appendChild(link);
+    
+    link.click();
+    
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+    </script>
+    <script>
+    function importNotes() {
+        var fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".json";
+
+        fileInput.addEventListener("change", function (event) {
+            var file = event.target.files[0];
+            var reader = new FileReader();
+
+            reader.onload = function (e) {
+                try {
+                    var importedNotes = JSON.parse(e.target.result);
+                    var existingNotes = JSON.parse(localStorage.getItem("notes")) || [];
+                    var mergedNotes = existingNotes.concat(importedNotes);
+                    localStorage.setItem("notes", JSON.stringify(mergedNotes));
+                    displayNotes();
+                    alert("备份内容已导入成功！");
+                } catch (error) {
+                    alert("导入失败：无效的备份文件！");
+                }
+            };
+
+            reader.readAsText(file);
+        });
+
+        fileInput.click();
+    }
+</script>
+
+</body>
+</html>
